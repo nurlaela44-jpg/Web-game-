@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bubble Blast — Water Puzzle</title>
+  <style>
+    :root{
+      --bg-deep:#06121e; --bg-2:#081a2b;
+      --text:#eef6ff; --muted:#99a9bd;
+      --blue:#69d3ff; --green:#73f7b2; --pink:#ff77ea; --yellow:#ffd36b;
+      --blue-g1:#b9ecff; --blue-g2:#69d3ff;
+      --green-g1:#c7ffe3; --green-g2:#73f7b2;
+      --pink-g1:#ffd0fb; --pink-g2:#ff77ea;
+      --yellow-g1:#fff0bf; --yellow-g2:#ffd36b;
+      --board:#0f2235; --board-line:rgba(255,255,255,0.08);
+      --accent:#77f7ff;
+    }
+    *{ box-sizing:border-box }
+    html,body{ height:100%; margin:0; font-family: Inter, system-ui, Segoe UI, Roboto, Arial }
+    body{
+      color:var(--text);
+      background:
+        radial-gradient(1000px 520px at 70% -10%, rgba(140,220,255,0.12), transparent 60%),
+        linear-gradient(180deg, var(--bg-deep), var(--bg-2));
+      display:flex; align-items:center; justify-content:center; padding:16px;
+      overflow:hidden;
+    }
+    /* Animated soft water ripple */
+    body::before{
+      content:""; position:fixed; inset:0; z-index:-2;
+      background:
+        radial-gradient(40% 60% at 20% 10%, rgba(110,231,255,0.15), transparent 60%),
+        radial-gradient(50% 70% at 80% 0%, rgba(183,255,230,0.12), transparent 60%),
+        conic-gradient(from 0deg, #6ee7ff, #bdfcde, #ffd36b, #ff77ea, #6ee7ff);
+      filter: blur(100px) saturate(1.1);
+      opacity:0.2; animation: rippleSpin 38s linear infinite;
+    }
+    @keyframes rippleSpin{ to{ transform: rotate(360deg) } }
+
+    .wrap{ width:100%; max-width:1080px; display:grid; grid-template-columns: 1fr 320px; gap:14px }
+    @media(max-width:980px){ .wrap{ grid-template-columns:1fr } }
+
+    header{ display:flex; align-items:center; gap:12px; margin-bottom:8px }
+    .logo{ width:56px; height:56px; border-radius:14px; display:grid; place-items:center; font-weight:900; color:#052433; background: linear-gradient(135deg,#7cfbff,#b9ffe6) }
+    h1{ margin:0; font-size:22px }
+
+    .game{ background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03)); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:12px; box-shadow:0 10px 40px rgba(0,0,0,0.35) }
+
+    .board-wrap{ display:grid; place-items:center }
+    #board{
+      position:relative; width:min(86vw, 560px); aspect-ratio: 8 / 12; /* COLS / ROWS */
+      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02)), var(--board);
+      border-radius:16px; overflow:hidden; border:1px solid rgba(255,255,255,0.08);
+      box-shadow: inset 0 0 30px rgba(0,0,0,0.35);
+    }
+    /* subtle grid lines to suggest puzzle board */
+    #board::after{
+      content:""; position:absolute; inset:0; pointer-events:none; opacity:0.35; mix-blend-mode:overlay;
+      background:
+        repeating-linear-gradient(0deg, var(--board-line) 0 1px, transparent 1px calc(100%/12)),
+        repeating-linear-gradient(90deg, var(--board-line) 0 1px, transparent 1px calc(100%/8));
+    }
+
+    /* Grid container holding cells absolutely for precise positioning */
+    .cells{ position:absolute; inset:0 }
+    .cell{ position:absolute; width: calc(100% / 8); height: calc(100% / 12); display:grid; place-items:center }
+
+    /* Bubble visuals */
+    .bubble{ position:relative; width:78%; height:78%; border-radius:50%; pointer-events:auto; user-select:none; cursor:pointer;
+      box-shadow: inset 0 6px 16px rgba(255,255,255,0.45), inset 0 -12px 22px rgba(86,180,255,0.22), 0 8px 22px rgba(0,0,0,0.45);
+      background:
+        radial-gradient(120% 120% at 30% 30%, rgba(255,255,255,0.95), rgba(255,255,255,0.25) 28%, rgba(255,255,255,0.08) 55%, rgba(255,255,255,0.03) 72%, rgba(255,255,255,0) 75%),
+        var(--grad);
+      transition: transform 120ms ease, filter 140ms ease;
+    }
+    .bubble:hover{ transform: translateY(-2px) scale(1.03) }
+    .bubble.blue{ --grad: radial-gradient(180% 180% at 50% 60%, var(--blue-g1), var(--blue-g2)); filter: drop-shadow(0 6px 12px rgba(105,211,255,0.45)) }
+    .bubble.green{ --grad: radial-gradient(180% 180% at 50% 60%, var(--green-g1), var(--green-g2)); filter: drop-shadow(0 6px 12px rgba(115,247,178,0.45)) }
+    .bubble.pink{ --grad: radial-gradient(180% 180% at 50% 60%, var(--pink-g1), var(--pink-g2)); filter: drop-shadow(0 6px 12px rgba(255,119,234,0.45)) }
+    .bubble.yellow{ --grad: radial-gradient(180% 180% at 50% 60%, var(--yellow-g1), var(--yellow-g2)); filter: drop-shadow(0 6px 12px rgba(255,211,107,0.42)) }
+
+    /* Pop animation */
+    .popping{ animation: pop 180ms ease-out forwards }
+    @keyframes pop{ to{ transform: scale(1.25); opacity:0 } }
+
+    /* Spawn drop-in effect for new bubbles */
+    .spawn{ animation: drop 220ms ease-out }
+    @keyframes drop{
+      from{ transform: translateY(-12%) scale(0.9); opacity:0.0 }
+      to{ transform: translateY(0) scale(1); opacity:1 }
+    }
+
+    .controls{ display:flex; gap:8px; align-items:center; margin:10px 0; flex-wrap:wrap }
+    button{ cursor:pointer; padding:9px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.06); color:var(--text) }
+    button.primary{ background:linear-gradient(90deg,#6ee7ff,#bdfcde); color:#06202b; border:none; font-weight:800 }
+    button.ghost{ background:transparent }
+    .tabs{ display:flex; gap:8px }
+    .tabs button.active{ background:linear-gradient(90deg,#6ee7ff,#bdfcde); color:#06202b; font-weight:800 }
+    .muted{ color:var(--muted); font-size:13px }
+    .panel{ background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03)); border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:12px }
+    .row{ display:flex; justify-content:space-between; align-items:center }
+    .big{ font-size:34px; font-weight:900; color:var(--yellow) }
+
+    /* Floating score text */
+    .floatScore{ position:absolute; color:#d2f8ff; font-weight:900; font-size:16px; text-shadow:0 2px 8px rgba(0,0,0,0.6); animation:floatScore 900ms ease-out forwards; pointer-events:none }
+    @keyframes floatScore{ to{ transform:translateY(-36px); opacity:0 } }
+
+  </style>
+  <meta name="theme-color" content="#06121e" />
+</head>
+<body>
+  <div class="wrap">
+    <div class="game">
+      <header>
+        <div class="logo">BB</div>
+        <div>
+          <h1>Bubble Blast — Water Puzzle</h1>
+          <div class="muted">Pop connected water bubbles on a grid. Adventure (60s) or Infinite.</div>
+        </div>
+      </header>
+
+      <div class="tabs" role="tablist" aria-label="Modes">
+        <button id="tabAdventure" class="active" role="tab" aria-selected="true">Adventure (Timed)</button>
+        <button id="tabInfinite" role="tab" aria-selected="false">Infinite (Relax)</button>
+      </div>
+
+      <div class="board-wrap">
+        <div id="board" aria-label="game board">
+          <div class="cells" id="cells"></div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button id="startBtn" class="primary">Start</button>
+        <button id="resetBtn" class="ghost">Reset</button>
+        <div class="muted">Score: <span id="score">0</span></div>
+        <div id="timerWrap" class="muted">Time: <span id="time">60</span>s</div>
+        <div style="margin-left:auto" class="muted">Tip: pop groups of 2+ matching bubbles</div>
+      </div>
+
+      <div style="display:flex; gap:12px; align-items:stretch">
+        <div class="panel" style="flex:1">
+          <div class="row"><div class="muted">High Score (Adventure)</div><div id="hsAdv" class="big">0</div></div>
+          <div class="row"><div class="muted">High Score (Infinite)</div><div id="hsInf" class="big">0</div></div>
+        </div>
+        <div class="panel" style="width:360px">
+          <div class="row"><strong>Settings</strong><span class="muted">v1.0</span></div>
+          <div class="muted" style="margin-top:6px">Board size</div>
+          <div class="row" style="gap:8px">
+            <label class="muted">Cols <input id="cols" type="number" min="6" max="10" value="8" style="width:70px"></label>
+            <label class="muted">Rows <input id="rows" type="number" min="10" max="14" value="12" style="width:70px"></label>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <aside class="panel">
+      <strong>How to Play</strong>
+      <ul class="muted">
+        <li>Click or tap on a group of <b>2+</b> connected bubbles of the same color.</li>
+        <li>They pop with a sound and animation; you get <b>+10</b> per bubble.</li>
+        <li>Gravity pulls bubbles down; new ones spawn from the top.</li>
+        <li>Adventure: score as much as you can in <b>60s</b>. Infinite: just relax.</li>
+      </ul>
+    </aside>
+  </div>
+
+  <script>
+    // --- Game constants ---
+    const COLORS = ['blue','green','pink','yellow'];
+    let ROWS = 12; let COLS = 8;
+
+    // --- DOM refs ---
+    const cellsLayer = document.getElementById('cells');
+    const boardEl = document.getElementById('board');
+    const scoreEl = document.getElementById('score');
+    const timeEl = document.getElementById('time');
+    const timerWrap = document.getElementById('timerWrap');
+    const startBtn = document.getElementById('startBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const tabAdventure = document.getElementById('tabAdventure');
+    const tabInfinite = document.getElementById('tabInfinite');
+    const inputCols = document.getElementById('cols');
+    const inputRows = document.getElementById('rows');
+    const hsAdvEl = document.getElementById('hsAdv');
+    const hsInfEl = document.getElementById('hsInf');
+
+    // --- Game state ---
+    let grid = [];
+    let running = false;
+    let mode = 'adventure'; // 'adventure' | 'infinite'
+    let score = 0;
+    let timeLeft = 60;
+    let timerHandle = null;
+    let ctx; // WebAudio context
+    const highs = {
+      adv: Number(localStorage.getItem('bb_hs_adv')||0),
+      inf: Number(localStorage.getItem('bb_hs_inf')||0)
+    };
+    hsAdvEl.textContent = highs.adv; hsInfEl.textContent = highs.inf;
+
+    // --- Utility ---
+    function randItem(arr){ return arr[Math.floor(Math.random()*arr.length)] }
+    function clamp(n, lo, hi){ return Math.max(lo, Math.min(hi, n)) }
+
+    function initGrid(){
+      grid = new Array(ROWS).fill(null).map(()=> new Array(COLS).fill(null));
+      for(let r=0;r<ROWS;r++){
+        for(let c=0;c<COLS;c++){
+          grid[r][c] = randItem(COLORS);
+        }
+      }
+    }
+
+    function cellRect(r,c){
+      const w = boardEl.clientWidth / COLS;
+      const h = boardEl.clientHeight / ROWS;
+      return { left: c*w, top: r*h, width:w, height:h };
+    }
+
+    function render(spawnAnim=false){
+      cellsLayer.innerHTML = '';
+      for(let r=0;r<ROWS;r++){
+        for(let c=0;c<COLS;c++){
+          const v = grid[r][c];
+          const cell = document.createElement('div'); cell.className = 'cell';
+          const rect = cellRect(r,c);
+          cell.style.left = rect.left+'px'; cell.style.top = rect.top+'px';
+          cell.style.width = rect.width+'px'; cell.style.height = rect.height+'px';
+          cell.dataset.r = r; cell.dataset.c = c;
+          if(v){
+            const b = document.createElement('div'); b.className = 'bubble '+v; if(spawnAnim) b.classList.add('spawn');
+            cell.appendChild(b);
+          }
+          cellsLayer.appendChild(cell);
+        }
+      }
+    }
+
+    // --- Audio ---
+    function popSound(){
+      try{
+        if(!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const o1 = ctx.createOscillator();
+        const o2 = ctx.createOscillator();
+        const g = ctx.createGain();
+        o1.type='sine'; o2.type='triangle';
+        const base = 620 + Math.random()*400;
+        o1.frequency.setValueAtTime(base, ctx.currentTime);
+        o2.frequency.setValueAtTime(base*0.5, ctx.currentTime);
+        const end = ctx.currentTime + 0.12;
+        o1.frequency.exponentialRampToValueAtTime(180, end);
+        o2.frequency.exponentialRampToValueAtTime(130, end);
+        g.gain.setValueAtTime(0.001, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.27, ctx.currentTime+0.01);
+        g.gain.exponentialRampToValueAtTime(0.001, end);
+        const comp = ctx.createDynamicsCompressor();
+        comp.attack.setValueAtTime(0.003, ctx.currentTime);
+        comp.release.setValueAtTime(0.05, ctx.currentTime);
+        o1.connect(g); o2.connect(g); g.connect(comp); comp.connect(ctx.destination);
+        o1.start(); o2.start(); o1.stop(end); o2.stop(end);
+      }catch(e){}
+    }
+
+    // --- Mechanics ---
+    function neighbors(r,c){
+      return [ [r-1,c], [r+1,c], [r,c-1], [r,c+1] ].filter(([rr,cc])=> rr>=0 && rr<ROWS && cc>=0 && cc<COLS);
+    }
+
+    function flood(r,c){
+      const target = grid[r][c]; if(!target) return new Set();
+      const key = (rr,cc)=> rr+','+cc;
+      const seen = new Set([key(r,c)]);
+      const stack = [[r,c]];
+      while(stack.length){
+        const [cr,cc] = stack.pop();
+        for(const [nr,nc] of neighbors(cr,cc)){
+          if(!seen.has(key(nr,nc)) && grid[nr][nc]===target){ seen.add(key(nr,nc)); stack.push([nr,nc]); }
+        }
+      }
+      return seen;
+    }
+
+    function popGroup(group){
+      // Visual pop: tag current elements as popping, then clear and apply gravity
+      for(const id of group){
+        const [r,c] = id.split(',').map(Number);
+        const cell = queryCell(r,c);
+        if(cell && cell.firstChild){ cell.firstChild.classList.add('popping'); }
+      }
+      popSound();
+      const gain = group.size * 10; score += gain; scoreEl.textContent = score;
+      const {left, top, width, height} = boardEl.getBoundingClientRect();
+      // floating score near center of group
+      const sum = [...group].map(id=> id.split(',').map(Number)).reduce((acc,[r,c])=>{ acc.r+=r; acc.c+=c; return acc }, {r:0,c:0});
+      const cr = Math.round(sum.r/group.size); const cc = Math.round(sum.c/group.size);
+      floatText('+'+gain, left + (cc+0.5)*(width/COLS), top + (cr+0.5)*(height/ROWS));
+
+      // After animation, clear and settle
+      setTimeout(()=>{
+        for(const id of group){
+          const [r,c] = id.split(',').map(Number);
+          grid[r][c] = null;
+        }
+        applyGravity();
+        spawnTop();
+        render(true);
+      }, 170);
+    }
+
+    function applyGravity(){
+      for(let c=0;c<COLS;c++){
+        let write = ROWS-1;
+        for(let r=ROWS-1;r>=0;r--){
+          if(grid[r][c]!==null){
+            const val = grid[r][c];
+            grid[r][c] = null; grid[write][c] = val; write--;
+          }
+        }
+      }
+    }
+
+    function spawnTop(){
+      for(let c=0;c<COLS;c++){
+        for(let r=0;r<ROWS;r++){
+          if(grid[r][c]===null){ grid[r][c] = randItem(COLORS); }
+        }
+      }
+    }
+
+    function queryCell(r,c){
+      return cellsLayer.querySelector('.cell[data-r="'+r+'"][data-c="'+c+'"]');
+    }
+
+    function floatText(text,x,y){
+      const t = document.createElement('div'); t.className='floatScore'; t.textContent=text;
+      t.style.left = x+'px'; t.style.top = y+'px';
+      document.body.appendChild(t);
+      setTimeout(()=> t.remove(), 950);
+    }
+
+    function handleClick(e){
+      if(!running) return;
+      const target = e.target.closest('.cell');
+      if(!target) return;
+      const r = Number(target.dataset.r); const c = Number(target.dataset.c);
+      if(grid[r][c]==null) return;
+      const group = flood(r,c);
+      if(group.size>=2){ popGroup(group); }
+    }
+
+    // --- Modes & lifecycle ---
+    function setMode(m){
+      if(running) return; // prevent mode swap mid-run
+      mode = m;
+      tabAdventure.classList.toggle('active', m==='adventure');
+      tabInfinite.classList.toggle('active', m==='infinite');
+      timerWrap.style.display = (m==='adventure') ? 'inline-flex' : 'none';
+    }
+
+    function startGame(){
+      if(running) return;
+      // apply custom board size
+      COLS = clamp(parseInt(inputCols.value||COLS,10), 6, 10);
+      ROWS = clamp(parseInt(inputRows.value||ROWS,10), 10, 14);
+      cellsLayer.innerHTML = '';
+      initGrid(); render(true);
+      score = 0; scoreEl.textContent = '0';
+      if(mode==='adventure'){
+        timeLeft = 60; timeEl.textContent = timeLeft;
+        timerHandle = setInterval(()=>{
+          timeLeft -= 1; timeEl.textContent = timeLeft;
+          if(timeLeft<=0){ endGame(); }
+        }, 1000);
+      }
+      running = true;
+    }
+
+    function endGame(){
+      running = false; if(timerHandle){ clearInterval(timerHandle); timerHandle=null; }
+      // Save highs
+      if(mode==='adventure'){
+        if(score>highs.adv){ highs.adv=score; localStorage.setItem('bb_hs_adv', String(highs.adv)); hsAdvEl.textContent = highs.adv; }
+      } else {
+        if(score>highs.inf){ highs.inf=score; localStorage.setItem('bb_hs_inf', String(highs.inf)); hsInfEl.textContent = highs.inf; }
+      }
+      // Small overlay message
+      const r = boardEl.getBoundingClientRect();
+      floatText('Game Over', r.left + r.width/2, r.top + 40);
+    }
+
+    function resetGame(){
+      if(timerHandle){ clearInterval(timerHandle); timerHandle=null; }
+      running = false; score = 0; scoreEl.textContent = '0';
+      timeEl.textContent = 60;
+      initGrid(); render(true);
+    }
+
+    // --- Events ---
+    cellsLayer.addEventListener('pointerdown', handleClick, {passive:true});
+    startBtn.addEventListener('click', startGame);
+    resetBtn.addEventListener('click', resetGame);
+    tabAdventure.addEventListener('click', ()=> setMode('adventure'));
+    tabInfinite.addEventListener('click', ()=> setMode('infinite'));
+    window.addEventListener('resize', ()=> render());
+
+    // Keyboard helpers
+    document.addEventListener('keydown', (e)=>{
+      if(e.key===' '){ e.preventDefault(); if(!running) startGame(); else endGame(); }
+      if(e.key==='r') resetGame();
+      if(e.key==='1') setMode('adventure');
+      if(e.key==='2') setMode('infinite');
+    });
+
+    // --- Boot ---
+    initGrid(); render(true);
+  </script>
+</body>
+</html>
+
