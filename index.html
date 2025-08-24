@@ -1,5 +1,692 @@
 <!doctype html>
 <html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <title>Bubble Blast</title>
+    <style>
+      :root {
+        --cols: 8;
+        --rows: 10;
+        --cell-gap: 8px; /* visual gap between bubbles */
+        --board-padding: 12px;
+        --ui-accent: #2bd3ff;
+        --text: #072a3a;
+      }
+
+      * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+        color: var(--text);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(1200px 800px at 10% 10%, rgba(255,255,255,0.4), rgba(255,255,255,0) 40%),
+                    radial-gradient(900px 700px at 90% 20%, rgba(59,193,255,0.18), rgba(59,193,255,0) 50%),
+                    radial-gradient(800px 800px at 20% 90%, rgba(132,255,234,0.16), rgba(132,255,234,0) 50%),
+                    linear-gradient(180deg, #c7f1ff 0%, #e9fbff 60%, #c6f5ff 100%);
+        overflow: hidden;
+      }
+
+      /* Subtle animated ripples */
+      body::before {
+        content: "";
+        position: absolute;
+        inset: -20% -10% -10% -20%;
+        background: radial-gradient(40% 20% at 50% 50%, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.0) 60%) repeat;
+        opacity: 0.4;
+        filter: blur(8px);
+        animation: ripple 14s ease-in-out infinite;
+        pointer-events: none;
+      }
+      @keyframes ripple {
+        0% { transform: translate3d(0,0,0) scale(1); }
+        50% { transform: translate3d(0,-1%,0) scale(1.03); }
+        100% { transform: translate3d(0,0,0) scale(1); }
+      }
+
+      .app {
+        position: relative;
+        width: min(94vw, 760px);
+        max-width: 760px;
+        padding: 18px clamp(12px, 2.5vw, 22px);
+        border-radius: 22px;
+        background: rgba(255, 255, 255, 0.55);
+        box-shadow: 0 12px 40px rgba(8, 77, 108, 0.18);
+        backdrop-filter: blur(8px) saturate(1.2);
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+      .title {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+      }
+      .title h1 {
+        margin: 0;
+        font-size: clamp(22px, 3.2vw, 34px);
+        letter-spacing: 0.5px;
+        color: #055069;
+        text-shadow: 0 1px 0 #fff;
+      }
+      .subtitle {
+        font-size: clamp(11px, 1.4vw, 13px);
+        color: #3a6b7c;
+        opacity: 0.85;
+      }
+
+      .controls {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+
+      .btn {
+        appearance: none;
+        border: 0;
+        border-radius: 999px;
+        padding: 10px 14px;
+        font-weight: 700;
+        font-size: 14px;
+        color: #054a5d;
+        background: linear-gradient(180deg, #e8fbff, #c6f5ff);
+        box-shadow: 0 2px 0 #b4e6f0, 0 6px 18px rgba(24, 142, 175, 0.22) inset;
+        cursor: pointer;
+        transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.15s;
+      }
+      .btn:hover { filter: brightness(1.05); }
+      .btn:active { transform: translateY(1px) scale(0.99); }
+      .btn.primary { background: linear-gradient(180deg, #bff1ff, #7be7ff); color: #053949; box-shadow: 0 2px 0 #57d2e8, 0 8px 22px rgba(0, 168, 204, 0.25) inset; }
+      .btn.secondary { background: linear-gradient(180deg, #ffe3f3, #ffd5ee); color: #6a0f46; box-shadow: 0 2px 0 #f6bfde, 0 8px 22px rgba(232, 66, 169, 0.18) inset; }
+
+      .stats {
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        font-weight: 800;
+        color: #0a3d4f;
+      }
+      .pill {
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.9);
+        box-shadow: 0 1px 0 rgba(3,36,45,0.08) inset;
+        min-width: 92px;
+        text-align: center;
+      }
+
+      .board-wrap {
+        position: relative;
+        display: grid;
+        place-items: center;
+      }
+      #board {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        border-radius: 18px;
+        padding: var(--board-padding);
+        background: linear-gradient(180deg, rgba(255,255,255,0.65), rgba(255,255,255,0.5)),
+                    radial-gradient(120% 100% at 10% 0%, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0.0) 60%),
+                    linear-gradient(180deg, #b6f2ff 0%, #c8fbff 70%, #a5eeff 100%);
+        box-shadow: 0 10px 26px rgba(6,69,92,0.18), 0 3px 0 rgba(255,255,255,0.8) inset;
+        overflow: hidden;
+      }
+      .grid-area {
+        position: absolute;
+        inset: var(--board-padding);
+      }
+
+      .bubble {
+        position: absolute;
+        width: var(--cell-size);
+        height: var(--cell-size);
+        border-radius: 999px;
+        transform: translateZ(0);
+        transition: top 220ms cubic-bezier(.22,1,.36,1), left 220ms cubic-bezier(.22,1,.36,1), transform 140ms ease;
+        box-shadow: 0 8px 18px rgba(0,0,0,0.12), 0 2px 0 rgba(255,255,255,0.7) inset, 0 -3px 10px rgba(255,255,255,0.25) inset;
+        will-change: top, left, transform;
+        cursor: pointer;
+      }
+      .bubble:active { transform: scale(0.98); }
+
+      /* Hover/touch highlight for poppable clusters */
+      .bubble.highlight {
+        transform: scale(1.06);
+        filter: saturate(1.1) brightness(1.04);
+        box-shadow: 0 0 0 6px rgba(255,255,255,0.38) inset, 0 10px 20px rgba(0,0,0,0.18);
+      }
+
+      /* Gloss highlight */
+      .bubble::after {
+        content: "";
+        position: absolute;
+        top: 10%;
+        left: 18%;
+        width: 44%;
+        height: 38%;
+        background: radial-gradient(60% 70% at 50% 50%, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0) 70%);
+        border-radius: 50%;
+        filter: blur(1px);
+        transform: rotate(-20deg);
+      }
+
+      /* Pop animation */
+      @keyframes pop-burst {
+        0% { transform: scale(1); opacity: 1; }
+        60% { transform: scale(1.2); opacity: 0.9; }
+        100% { transform: scale(0.7); opacity: 0; }
+      }
+      .popping { animation: pop-burst 180ms ease forwards; }
+
+      /* Color themes for bubbles */
+      .c-blue   { background: radial-gradient(120% 120% at 30% 30%, #c3f0ff 0%, #8ee6ff 35%, #4ad1ff 60%, #20aee3 100%); box-shadow: 0 0 16px rgba(23, 173, 255, 0.45), 0 2px 0 rgba(255,255,255,0.7) inset, 0 -3px 10px rgba(255,255,255,0.25) inset; }
+      .c-green  { background: radial-gradient(120% 120% at 30% 30%, #d8ffe8 0%, #b5ffd7 35%, #69f3b1 60%, #36d893 100%); box-shadow: 0 0 16px rgba(62, 214, 160, 0.45), 0 2px 0 rgba(255,255,255,0.7) inset, 0 -3px 10px rgba(255,255,255,0.25) inset; }
+      .c-pink   { background: radial-gradient(120% 120% at 30% 30%, #ffe1f4 0%, #ffc3e9 35%, #ff86cf 60%, #ff4fb0 100%); box-shadow: 0 0 16px rgba(255, 87, 173, 0.4), 0 2px 0 rgba(255,255,255,0.7) inset, 0 -3px 10px rgba(255,255,255,0.25) inset; }
+      .c-yellow { background: radial-gradient(120% 120% at 30% 30%, #fff8d0 0%, #fff1a6 35%, #ffe168 60%, #ffc62b 100%); box-shadow: 0 0 16px rgba(255, 201, 71, 0.42), 0 2px 0 rgba(255,255,255,0.7) inset, 0 -3px 10px rgba(255,255,255,0.25) inset; }
+
+      /* Shuffle flash feedback */
+      @keyframes shuffle-flash {
+        0% { filter: brightness(1); }
+        50% { filter: brightness(1.15) saturate(1.1); }
+        100% { filter: brightness(1); }
+      }
+      #board.shuffle { animation: shuffle-flash 320ms ease; }
+
+      .footer {
+        margin-top: 12px;
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        color: #3a6b7c;
+        opacity: 0.85;
+      }
+
+      .overlay {
+        position: absolute;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255,255,255,0.62);
+        backdrop-filter: blur(3px);
+        border-radius: 18px;
+      }
+      .overlay.show { display: flex; }
+      .overlay-card {
+        padding: 20px 22px;
+        border-radius: 16px;
+        background: linear-gradient(180deg, #ffffff, #f2fdff);
+        box-shadow: 0 16px 40px rgba(6,69,92,0.2);
+        text-align: center;
+      }
+      .overlay-card h3 { margin: 0 0 6px 0; }
+      .overlay-card p { margin: 0 0 12px 0; color: #356175; }
+
+      @media (max-width: 520px) {
+        .stats .pill { min-width: 80px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <div class="topbar">
+        <div class="title">
+          <h1>Bubble Blast</h1>
+          <div class="subtitle">Water-bubble pop</div>
+        </div>
+        <div class="controls">
+          <button id="btnAdventure" class="btn primary">Adventure</button>
+          <button id="btnInfinite" class="btn secondary">Infinite</button>
+        </div>
+        <div class="stats">
+          <div id="score" class="pill">Score: 0</div>
+          <div id="timer" class="pill">∞</div>
+        </div>
+      </div>
+
+      <div class="board-wrap">
+        <div id="board">
+          <div class="grid-area" id="grid"></div>
+          <div id="overlay" class="overlay">
+            <div class="overlay-card">
+              <h3>Time's up!</h3>
+              <p>Your score: <span id="finalScore">0</span></p>
+              <button id="btnPlayAgain" class="btn primary">Play again</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <div>Tip: Pop 2+ connected bubbles for points. Each bubble = +10.</div>
+        <div>Modes: Adventure 60s • Infinite relax</div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        'use strict';
+
+        // Config
+        const NUM_ROWS = 10;
+        const NUM_COLS = 8;
+        const COLORS = ['blue','green','pink','yellow'];
+        const COLOR_CLASS = {
+          blue: 'c-blue',
+          green: 'c-green',
+          pink: 'c-pink',
+          yellow: 'c-yellow'
+        };
+        const POINTS_PER_BUBBLE = 10;
+
+        // DOM
+        const boardEl = document.getElementById('board');
+        const gridEl = document.getElementById('grid');
+        const scoreEl = document.getElementById('score');
+        const timerEl = document.getElementById('timer');
+        const overlayEl = document.getElementById('overlay');
+        const finalScoreEl = document.getElementById('finalScore');
+        const btnAdventure = document.getElementById('btnAdventure');
+        const btnInfinite = document.getElementById('btnInfinite');
+        const btnPlayAgain = document.getElementById('btnPlayAgain');
+
+        // Layout sizing
+        let cellSizePx = 48; // computed on layout
+        function computeBoardSize() {
+          const maxWidth = Math.min(window.innerWidth * 0.94, 760);
+          // We want square-ish cells and the board to fit nicely.
+          const availableWidth = maxWidth - 2 * 18; // app padding approx
+          const boardMax = availableWidth; // board wrapper width
+          // Leave padding inside board and gaps between cells visually via CSS gap effect baked into bubble size
+          const innerPadding = 2 * parseFloat(getComputedStyle(boardEl).getPropertyValue('--board-padding')) || 24;
+          const usable = boardMax - innerPadding;
+          const sizeByWidth = Math.floor( (usable - (NUM_COLS - 1) * (getCellGap())) / NUM_COLS );
+          const sizeByHeight = Math.floor( (usable * 1.25 - (NUM_ROWS - 1) * (getCellGap())) / NUM_ROWS );
+          // Choose smaller to fully fit
+          cellSizePx = Math.max(24, Math.min(sizeByWidth, sizeByHeight, 72));
+          // Set board size precisely to fit grid
+          const boardInnerW = NUM_COLS * cellSizePx + (NUM_COLS - 1) * getCellGap();
+          const boardInnerH = NUM_ROWS * cellSizePx + (NUM_ROWS - 1) * getCellGap();
+          boardEl.style.width = (boardInnerW + innerPadding) + 'px';
+          boardEl.style.height = (boardInnerH + innerPadding) + 'px';
+          gridEl.style.setProperty('--cell-size', cellSizePx + 'px');
+          boardEl.style.setProperty('--cell-size', cellSizePx + 'px');
+        }
+
+        function getCellGap() {
+          const cssGap = getComputedStyle(document.documentElement).getPropertyValue('--cell-gap');
+          return parseInt(cssGap || '8', 10);
+        }
+
+        // Game state
+        /** @type {(null | { id: number; color: string; })[][]} */
+        let board = [];
+        let idCounter = 1;
+        /** @type {Map<number, HTMLElement>} */
+        const idToEl = new Map();
+        let isAnimating = false;
+        let score = 0;
+        let mode = 'infinite'; // 'adventure' | 'infinite'
+        let timeLeft = Infinity; // in seconds
+        let timerHandle = null;
+
+        // Audio
+        let audioCtx = null;
+        let firstInteractionBound = false;
+        let audioReady = false;
+        function ensureAudio() {
+          if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          }
+          if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+          }
+          audioReady = true;
+        }
+        function bindFirstInteraction() {
+          if (firstInteractionBound) return;
+          firstInteractionBound = true;
+          const unlock = () => {
+            ensureAudio();
+            window.removeEventListener('pointerdown', unlock);
+            window.removeEventListener('keydown', unlock);
+          };
+          window.addEventListener('pointerdown', unlock, { once: true });
+          window.addEventListener('keydown', unlock, { once: true });
+        }
+        function playPopSound(popCount) {
+          if (!audioCtx || !audioReady) return;
+          const now = audioCtx.currentTime;
+          const voices = Math.min(8, Math.max(1, Math.floor(popCount / 2)));
+          for (let v = 0; v < voices; v++) {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            const startFreq = 600 + Math.random() * 200 + v * 20;
+            const endFreq = startFreq * (0.6 + Math.random() * 0.1);
+            const t0 = now + v * 0.005;
+            const t1 = t0 + 0.11 + Math.random() * 0.02;
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(startFreq, t0);
+            osc.frequency.exponentialRampToValueAtTime(endFreq, t1);
+            gain.gain.setValueAtTime(0.0001, t0);
+            gain.gain.exponentialRampToValueAtTime(0.22 / voices, t0 + 0.01);
+            gain.gain.exponentialRampToValueAtTime(0.0001, t1);
+            osc.connect(gain).connect(audioCtx.destination);
+            osc.start(t0);
+            osc.stop(t1 + 0.02);
+          }
+        }
+
+        // Utilities
+        function randColor() { return COLORS[(Math.random() * COLORS.length) | 0]; }
+        function inBounds(r, c) { return r >= 0 && r < NUM_ROWS && c >= 0 && c < NUM_COLS; }
+
+        // Initialize board state
+        function initBoard() {
+          board = Array.from({ length: NUM_ROWS }, () => Array.from({ length: NUM_COLS }, () => null));
+          idToEl.clear();
+          gridEl.innerHTML = '';
+          // Spawn initial bubbles
+          for (let c = 0; c < NUM_COLS; c++) {
+            for (let r = 0; r < NUM_ROWS; r++) {
+              spawnBubbleAt(r, c, true /* instant */);
+            }
+          }
+        }
+
+        function bubbleTop(r) { return r * (cellSizePx + getCellGap()); }
+        function bubbleLeft(c) { return c * (cellSizePx + getCellGap()); }
+
+        function createBubbleEl(bubble, row, col) {
+          const el = document.createElement('div');
+          el.className = `bubble ${COLOR_CLASS[bubble.color]}`;
+          el.style.width = cellSizePx + 'px';
+          el.style.height = cellSizePx + 'px';
+          el.style.top = bubbleTop(row) + 'px';
+          el.style.left = bubbleLeft(col) + 'px';
+          el.dataset.id = String(bubble.id);
+          el.dataset.row = String(row);
+          el.dataset.col = String(col);
+          el.dataset.color = bubble.color;
+          el.addEventListener('pointerdown', onBubblePointer, { passive: true });
+          el.addEventListener('pointerenter', onBubbleEnter);
+          el.addEventListener('pointerleave', onBubbleLeave);
+          return el;
+        }
+
+        function spawnBubbleAt(row, col, instant = false) {
+          const bubble = { id: idCounter++, color: randColor() };
+          board[row][col] = bubble;
+          const el = createBubbleEl(bubble, instant ? row : -1, col);
+          idToEl.set(bubble.id, el);
+          gridEl.appendChild(el);
+          // Animate from above if not instant
+          if (!instant) {
+            requestAnimationFrame(() => {
+              el.style.top = bubbleTop(row) + 'px';
+            });
+          }
+          // Ensure dataset reflects the actual target grid position for interaction logic
+          el.dataset.row = String(row);
+          el.dataset.col = String(col);
+        }
+
+        function onBubblePointer(e) {
+          if (isAnimating) return;
+          const target = e.currentTarget;
+          const r = parseInt(target.dataset.row, 10);
+          const c = parseInt(target.dataset.col, 10);
+          if (!inBounds(r, c)) return;
+          const bubble = board[r][c];
+          if (!bubble) return;
+          const cluster = findCluster(r, c, bubble.color);
+          if (cluster.length < 2) return; // need at least 2 to pop
+          popCluster(cluster);
+        }
+
+        // Hover/touch preview highlight
+        function onBubbleEnter(e) {
+          if (isAnimating) return;
+          const target = e.currentTarget;
+          const r = parseInt(target.dataset.row, 10);
+          const c = parseInt(target.dataset.col, 10);
+          if (!inBounds(r, c)) return;
+          const b = board[r][c];
+          if (!b) return;
+          const cluster = findCluster(r, c, b.color);
+          removeHighlights();
+          if (cluster.length >= 2) {
+            for (const [rr, cc] of cluster) {
+              const bb = board[rr][cc];
+              if (!bb) continue;
+              const el = idToEl.get(bb.id);
+              if (el) el.classList.add('highlight');
+            }
+          }
+        }
+        function onBubbleLeave() { removeHighlights(); }
+        function removeHighlights() {
+          idToEl.forEach(el => el.classList.remove('highlight'));
+        }
+
+        function findCluster(row, col, color) {
+          /** @type {Array<[number, number]>} */
+          const stack = [[row, col]];
+          /** @type {boolean[][]} */
+          const visited = Array.from({ length: NUM_ROWS }, () => Array.from({ length: NUM_COLS }, () => false));
+          const cells = [];
+          while (stack.length) {
+            const [r, c] = stack.pop();
+            if (!inBounds(r, c) || visited[r][c]) continue;
+            visited[r][c] = true;
+            const b = board[r][c];
+            if (!b || b.color !== color) continue;
+            cells.push([r, c]);
+            stack.push([r+1, c], [r-1, c], [r, c+1], [r, c-1]);
+          }
+          return cells;
+        }
+
+        function popCluster(cells) {
+          isAnimating = true;
+          // Score
+          const popped = cells.length;
+          score += popped * POINTS_PER_BUBBLE;
+          scoreEl.textContent = `Score: ${score}`;
+
+          // Trigger pop animation and remove from state after
+          for (const [r, c] of cells) {
+            const b = board[r][c];
+            if (!b) continue;
+            const el = idToEl.get(b.id);
+            if (!el) continue;
+            el.classList.add('popping');
+          }
+          // Play sound
+          playPopSound(cells.length);
+
+          // After pop animation, clear and apply gravity
+          setTimeout(() => {
+            // Clear from state + DOM
+            for (const [r, c] of cells) {
+              const b = board[r][c];
+              if (!b) continue;
+              const el = idToEl.get(b.id);
+              if (el && el.parentNode) el.parentNode.removeChild(el);
+              idToEl.delete(b.id);
+              board[r][c] = null;
+            }
+            applyGravityAndSpawn();
+          }, 190);
+        }
+
+        function applyGravityAndSpawn() {
+          // Compact each column downward
+          const gap = getCellGap();
+          const moves = [];
+          for (let c = 0; c < NUM_COLS; c++) {
+            let writeRow = NUM_ROWS - 1;
+            for (let r = NUM_ROWS - 1; r >= 0; r--) {
+              const b = board[r][c];
+              if (b) {
+                if (r !== writeRow) {
+                  board[writeRow][c] = b;
+                  board[r][c] = null;
+                  moves.push({ id: b.id, fromR: r, toR: writeRow, col: c });
+                }
+                writeRow--;
+              }
+            }
+            // Now spawn for remaining empty cells at top [0..writeRow]
+            const spawnCount = writeRow + 1;
+            for (let s = 0; s < spawnCount; s++) {
+              const targetRow = writeRow - s;
+              if (targetRow < 0) break;
+              spawnBubbleAt(targetRow, c, false /* animate from top */);
+            }
+          }
+
+          // Animate moved elements
+          if (moves.length) {
+            requestAnimationFrame(() => {
+              for (const m of moves) {
+                const el = idToEl.get(m.id);
+                if (!el) continue;
+                el.dataset.row = String(m.toR);
+                el.style.top = (m.toR * (cellSizePx + gap)) + 'px';
+              }
+            });
+          }
+
+          // Finish
+          setTimeout(() => {
+            isAnimating = false;
+            checkAndShuffleIfStuck();
+          }, 260);
+        }
+
+        function anyMovesAvailable() {
+          for (let r = 0; r < NUM_ROWS; r++) {
+            for (let c = 0; c < NUM_COLS; c++) {
+              const b = board[r][c];
+              if (!b) continue;
+              if ((inBounds(r+1,c) && board[r+1][c] && board[r+1][c].color === b.color) ||
+                  (inBounds(r-1,c) && board[r-1][c] && board[r-1][c].color === b.color) ||
+                  (inBounds(r,c+1) && board[r][c+1] && board[r][c+1].color === b.color) ||
+                  (inBounds(r,c-1) && board[r][c-1] && board[r][c-1].color === b.color)) {
+                return true;
+              }
+            }
+          }
+          return false;
+        }
+
+        function checkAndShuffleIfStuck() {
+          if (anyMovesAvailable()) return;
+          const existing = [];
+          for (let r = 0; r < NUM_ROWS; r++) {
+            for (let c = 0; c < NUM_COLS; c++) {
+              const b = board[r][c];
+              if (b) existing.push(b);
+            }
+          }
+          for (const b of existing) {
+            b.color = randColor();
+            const el = idToEl.get(b.id);
+            if (el) {
+              el.classList.remove('c-blue','c-green','c-pink','c-yellow');
+              el.classList.add(COLOR_CLASS[b.color]);
+            }
+          }
+          boardEl.classList.add('shuffle');
+          setTimeout(() => boardEl.classList.remove('shuffle'), 340);
+        }
+
+        // Modes
+        function setMode(newMode) {
+          mode = newMode;
+          if (timerHandle) { clearInterval(timerHandle); timerHandle = null; }
+          if (mode === 'adventure') {
+            timeLeft = 60;
+            timerEl.textContent = '60s';
+            timerHandle = setInterval(() => {
+              timeLeft -= 1;
+              if (timeLeft <= 0) {
+                timerEl.textContent = '0s';
+                clearInterval(timerHandle);
+                timerHandle = null;
+                onGameOver();
+              } else {
+                timerEl.textContent = timeLeft + 's';
+              }
+            }, 1000);
+          } else {
+            timeLeft = Infinity;
+            timerEl.textContent = '∞';
+          }
+          overlayEl.classList.remove('show');
+          resetGame();
+          // Audio unlock on fresh start
+          bindFirstInteraction();
+        }
+
+        function onGameOver() {
+          isAnimating = true;
+          finalScoreEl.textContent = String(score);
+          overlayEl.classList.add('show');
+        }
+
+        function resetGame() {
+          score = 0;
+          scoreEl.textContent = 'Score: 0';
+          initBoard();
+          isAnimating = false;
+        }
+
+        // Input bindings
+        btnAdventure.addEventListener('click', () => setMode('adventure'));
+        btnInfinite.addEventListener('click', () => setMode('infinite'));
+        btnPlayAgain.addEventListener('click', () => setMode('adventure'));
+
+        // Resize handling
+        function onResize() {
+          computeBoardSize();
+          // Reposition all bubbles based on new cell size
+          const gap = getCellGap();
+          idToEl.forEach((el) => {
+            const r = parseInt(el.dataset.row, 10);
+            const c = parseInt(el.dataset.col, 10);
+            el.style.width = cellSizePx + 'px';
+            el.style.height = cellSizePx + 'px';
+            el.style.top = (r * (cellSizePx + gap)) + 'px';
+            el.style.left = (c * (cellSizePx + gap)) + 'px';
+          });
+        }
+        window.addEventListener('resize', onResize);
+
+        // Boot
+        computeBoardSize();
+        initBoard();
+        setMode('infinite');
+        bindFirstInteraction();
+        window.addEventListener('click', ensureAudio, { once: true });
+
+      })();
+    </script>
+  </body>
+</html>
+
+<!-- Removed duplicate HTML document that caused ID conflicts and errors -->
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
