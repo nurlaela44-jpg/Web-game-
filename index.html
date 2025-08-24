@@ -417,6 +417,9 @@
               el.style.top = bubbleTop(row) + 'px';
             });
           }
+          // Ensure dataset reflects the actual target grid position for interaction logic
+          el.dataset.row = String(row);
+          el.dataset.col = String(col);
         }
 
         function onBubblePointer(e) {
