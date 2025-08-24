@@ -343,6 +343,7 @@
         // Audio
         let audioCtx = null;
         let firstInteractionBound = false;
+        let audioReady = false;
         function ensureAudio() {
           if (!audioCtx) {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -350,6 +351,7 @@
           if (audioCtx.state === 'suspended') {
             audioCtx.resume();
           }
+          audioReady = true;
         }
         function bindFirstInteraction() {
           if (firstInteractionBound) return;
@@ -363,7 +365,7 @@
           window.addEventListener('keydown', unlock, { once: true });
         }
         function playPopSound(popCount) {
-          if (!audioCtx) return;
+          if (!audioCtx || !audioReady) return;
           const now = audioCtx.currentTime;
           const voices = Math.min(8, Math.max(1, Math.floor(popCount / 2)));
           for (let v = 0; v < voices; v++) {
@@ -417,6 +419,8 @@
           el.dataset.col = String(col);
           el.dataset.color = bubble.color;
           el.addEventListener('pointerdown', onBubblePointer, { passive: true });
+          el.addEventListener('pointerenter', onBubbleEnter);
+          el.addEventListener('pointerleave', onBubbleLeave);
           return el;
         }
 
@@ -448,6 +452,31 @@
           const cluster = findCluster(r, c, bubble.color);
           if (cluster.length < 2) return; // need at least 2 to pop
           popCluster(cluster);
+        }
+
+        // Hover/touch preview highlight
+        function onBubbleEnter(e) {
+          if (isAnimating) return;
+          const target = e.currentTarget;
+          const r = parseInt(target.dataset.row, 10);
+          const c = parseInt(target.dataset.col, 10);
+          if (!inBounds(r, c)) return;
+          const b = board[r][c];
+          if (!b) return;
+          const cluster = findCluster(r, c, b.color);
+          removeHighlights();
+          if (cluster.length >= 2) {
+            for (const [rr, cc] of cluster) {
+              const bb = board[rr][cc];
+              if (!bb) continue;
+              const el = idToEl.get(bb.id);
+              if (el) el.classList.add('highlight');
+            }
+          }
+        }
+        function onBubbleLeave() { removeHighlights(); }
+        function removeHighlights() {
+          idToEl.forEach(el => el.classList.remove('highlight'));
         }
 
         function findCluster(row, col, color) {
@@ -540,7 +569,47 @@
           }
 
           // Finish
-          setTimeout(() => { isAnimating = false; }, 260);
+          setTimeout(() => {
+            isAnimating = false;
+            checkAndShuffleIfStuck();
+          }, 260);
+        }
+
+        function anyMovesAvailable() {
+          for (let r = 0; r < NUM_ROWS; r++) {
+            for (let c = 0; c < NUM_COLS; c++) {
+              const b = board[r][c];
+              if (!b) continue;
+              if ((inBounds(r+1,c) && board[r+1][c] && board[r+1][c].color === b.color) ||
+                  (inBounds(r-1,c) && board[r-1][c] && board[r-1][c].color === b.color) ||
+                  (inBounds(r,c+1) && board[r][c+1] && board[r][c+1].color === b.color) ||
+                  (inBounds(r,c-1) && board[r][c-1] && board[r][c-1].color === b.color)) {
+                return true;
+              }
+            }
+          }
+          return false;
+        }
+
+        function checkAndShuffleIfStuck() {
+          if (anyMovesAvailable()) return;
+          const existing = [];
+          for (let r = 0; r < NUM_ROWS; r++) {
+            for (let c = 0; c < NUM_COLS; c++) {
+              const b = board[r][c];
+              if (b) existing.push(b);
+            }
+          }
+          for (const b of existing) {
+            b.color = randColor();
+            const el = idToEl.get(b.id);
+            if (el) {
+              el.classList.remove('c-blue','c-green','c-pink','c-yellow');
+              el.classList.add(COLOR_CLASS[b.color]);
+            }
+          }
+          boardEl.classList.add('shuffle');
+          setTimeout(() => boardEl.classList.remove('shuffle'), 340);
         }
 
         // Modes
@@ -610,14 +679,14 @@
         initBoard();
         setMode('infinite');
         bindFirstInteraction();
+        window.addEventListener('click', ensureAudio, { once: true });
 
       })();
     </script>
   </body>
 </html>
 
-<!doctype html>
-<html lang="en">
+<!-- Removed duplicate HTML document that caused ID conflicts and errors -->
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
