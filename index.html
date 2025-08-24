@@ -159,6 +159,13 @@
       }
       .bubble:active { transform: scale(0.98); }
 
+      /* Hover/touch highlight for poppable clusters */
+      .bubble.highlight {
+        transform: scale(1.06);
+        filter: saturate(1.1) brightness(1.04);
+        box-shadow: 0 0 0 6px rgba(255,255,255,0.38) inset, 0 10px 20px rgba(0,0,0,0.18);
+      }
+
       /* Gloss highlight */
       .bubble::after {
         content: "";
@@ -186,6 +193,14 @@
       .c-green  { background: radial-gradient(120% 120% at 30% 30%, #d8ffe8 0%, #b5ffd7 35%, #69f3b1 60%, #36d893 100%); box-shadow: 0 0 16px rgba(62, 214, 160, 0.45), 0 2px 0 rgba(255,255,255,0.7) inset, 0 -3px 10px rgba(255,255,255,0.25) inset; }
       .c-pink   { background: radial-gradient(120% 120% at 30% 30%, #ffe1f4 0%, #ffc3e9 35%, #ff86cf 60%, #ff4fb0 100%); box-shadow: 0 0 16px rgba(255, 87, 173, 0.4), 0 2px 0 rgba(255,255,255,0.7) inset, 0 -3px 10px rgba(255,255,255,0.25) inset; }
       .c-yellow { background: radial-gradient(120% 120% at 30% 30%, #fff8d0 0%, #fff1a6 35%, #ffe168 60%, #ffc62b 100%); box-shadow: 0 0 16px rgba(255, 201, 71, 0.42), 0 2px 0 rgba(255,255,255,0.7) inset, 0 -3px 10px rgba(255,255,255,0.25) inset; }
+
+      /* Shuffle flash feedback */
+      @keyframes shuffle-flash {
+        0% { filter: brightness(1); }
+        50% { filter: brightness(1.15) saturate(1.1); }
+        100% { filter: brightness(1); }
+      }
+      #board.shuffle { animation: shuffle-flash 320ms ease; }
 
       .footer {
         margin-top: 12px;
