@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Modern Starter</title>
+  <meta name="description" content="A modern, responsive starter website.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="logo" href="#home">Modern<span>Site</span></a>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+    </button>
+    <nav id="site-nav" class="site-nav">
+      <ul>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#about">About</a></li>
+        <li><a href="#contact">Contact</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main id="home">
+    <section class="hero">
+      <div class="hero-content">
+        <h1>Build something great</h1>
+        <p>A clean, fast starter you can deploy anywhere.</p>
+        <div class="hero-actions">
+          <a class="btn primary" href="#features">Explore features</a>
+          <a class="btn" href="#contact">Get in touch</a>
+        </div>
+      </div>
+      <img class="hero-illustration" alt="abstract shapes" src="https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?q=80&w=1200&auto=format&fit=crop">
+    </section>
+
+    <section id="features" class="section features">
+      <h2>Features</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>Fast</h3>
+          <p>Lightweight assets and best practices for performance.</p>
+        </article>
+        <article class="card">
+          <h3>Responsive</h3>
+          <p>Looks great on phones, tablets, and desktops.</p>
+        </article>
+        <article class="card">
+          <h3>Accessible</h3>
+          <p>Semantic markup and high-contrast design.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="about" class="section about">
+      <h2>About</h2>
+      <p>This starter includes an opinionated layout, modern typography, and a few helpful interactions.</p>
+    </section>
+
+    <section id="contact" class="section contact">
+      <h2>Contact</h2>
+      <form id="contact-form" novalidate>
+        <label>
+          <span>Name</span>
+          <input name="name" required>
+        </label>
+        <label>
+          <span>Email</span>
+          <input type="email" name="email" required>
+        </label>
+        <label>
+          <span>Message</span>
+          <textarea name="message" rows="4" required></textarea>
+        </label>
+        <button class="btn primary" type="submit">Send</button>
+        <p class="form-status" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>© <span id="year"></span> ModernSite. All rights reserved.</p>
+  </footer>
+
+  <script src="script.js" defer></script>
+</body>
+</html>
